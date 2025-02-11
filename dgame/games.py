@@ -76,7 +76,6 @@ class DictatorGame:
         return {
             "game_id": str(uuid.uuid4()),
             "model": self.model,
-            "endowment": self.endowment,
             "allocation": allocation,
             "tokens_used": response.usage.input_tokens + response.usage.output_tokens
         }
@@ -85,8 +84,7 @@ class DictatorGame:
         self,
         n_games: int = 5,
         experiment_id: Optional[str] = None,
-        output_dir: Optional[Union[str, Path]] = "results",
-        save_results: bool = True
+        output_dir: Optional[Union[str, Path]] = None,
     ) -> List[Dict[str, Union[str, int, float]]]:
         """
         Run multiple games and optionally save results.
@@ -94,8 +92,7 @@ class DictatorGame:
         Args:
             n_games: Number of games to run
             experiment_id: Optional identifier for this experiment
-            output_dir: Directory to save results (if save_results=True)
-            save_results: Whether to save results to file
+            output_dir: If provided, directory to save results
             
         Returns:
             List of result dictionaries
@@ -110,8 +107,8 @@ class DictatorGame:
             result["batch_id"] = batch_id
             results.append(result)
         
-        # Save if requested
-        if save_results:
+        # Save if output_dir is provided
+        if output_dir is not None:
             save_results(
                 results,
                 output_dir=output_dir,

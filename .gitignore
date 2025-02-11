@@ -7,6 +7,9 @@
 # Documents
 docs/
 
+# Output
+results/
+
 # Python
 __pycache__/
 *.py[cod]

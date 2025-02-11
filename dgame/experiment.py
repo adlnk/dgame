@@ -11,10 +11,9 @@ def run_experiment():
     
     # Run a batch of 10 games
     results = game.run_batch(
-        n_games=10,
+        n_games=1,
         experiment_id="basic_experiment",
-        output_dir="results",
-        save_results=True
+        output_dir="results"
     )
     
     # Print summary of results
