@@ -46,7 +46,7 @@ class DictatorGame:
         with open(self.tool_path, 'r') as f:
             self.tool = json.load(f)
     
-    async def run_game(self) -> Dict[str, Union[str, int, float]]:
+    def run_game(self) -> Dict[str, Union[str, int, float]]:
         """
         Run a single game and return the results.
         
@@ -58,7 +58,7 @@ class DictatorGame:
             - tokens_used: Total tokens used
             - game_id: Unique identifier for this game
         """
-        response = await self.client.messages.create(
+        response = self.client.messages.create(
             model=self.model,
             messages=[{"role": "user", "content": self.prompt}],
             max_tokens=300,
@@ -81,7 +81,7 @@ class DictatorGame:
             "tokens_used": response.usage.input_tokens + response.usage.output_tokens
         }
     
-    async def run_batch(
+    def run_batch(
         self,
         n_games: int = 5,
         experiment_id: Optional[str] = None,
@@ -106,7 +106,7 @@ class DictatorGame:
         # Run games
         results = []
         for _ in range(n_games):
-            result = await self.run_game()
+            result = self.run_game()
             result["batch_id"] = batch_id
             results.append(result)
         
