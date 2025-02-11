@@ -1,0 +1,14 @@
+{
+    "name": "allocate",
+    "description": "Allocate units of a resource to your game partner",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "units": {
+                "type": "number",
+                "description": "An integer between 0 and 100, representing the number of units to give to your partner"
+            }
+        },
+        "required": ["units"]
+    }
+}
