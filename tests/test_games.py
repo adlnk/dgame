@@ -8,7 +8,8 @@ def test_simple_game():
     
     try:
         game = SimpleDGame(
-            prompt_path=Path("prompts/basic.txt")
+            prompt_path=Path("prompts/basic.txt"),
+            total_amount=100
         )
         
         results = game.run_batch(

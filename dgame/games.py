@@ -155,6 +155,7 @@ class DictatorGame(ABC):
             "error": error,
             "input_tokens_used": response.usage.input_tokens,
             "output_tokens_used": response.usage.output_tokens,
+            "response": response.content[0].text,  # Store full response
             # Initialize allocation values to None
             "alloc0": None,
             "alloc1": None
