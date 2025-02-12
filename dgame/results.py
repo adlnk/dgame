@@ -1,20 +1,19 @@
 from pathlib import Path
 import pandas as pd
-from datetime import datetime
 from typing import Dict, List, Union
 
 def save_results(
     results: List[Dict],
-    output_dir: Union[str, Path] = "results",
+    output_dir: Union[str, Path],
     experiment_id: str = None,
     batch_id: str = None
 ) -> Path:
     """
-    Save results to CSV file.
+    Save game results to CSV file.
     
     Args:
         results: List of result dictionaries
-        output_dir: Directory to store results (default: "results")
+        output_dir: Directory to store results
         experiment_id: Optional identifier for experiment
         batch_id: Optional identifier for batch
         
@@ -24,21 +23,19 @@ def save_results(
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True)
     
-    # Add metadata to each result
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    for result in results:
-        result["timestamp"] = timestamp
-        if experiment_id:
-            result["experiment_id"] = experiment_id
-        if batch_id:
-            result["batch_id"] = batch_id
-    
-    # Convert to DataFrame and save
+    # Convert to DataFrame
     df = pd.DataFrame(results)
-    filename = f"results_{timestamp}.csv"
-    if experiment_id:
-        filename = f"{experiment_id}_{filename}"
     
+    # Construct filename
+    parts = []
+    if experiment_id:
+        parts.append(experiment_id)
+    if batch_id:
+        parts.append(batch_id)
+    parts.append("results.csv")
+    filename = "_".join(parts)
+    
+    # Save
     output_path = output_dir / filename
     df.to_csv(output_path, index=False)
     

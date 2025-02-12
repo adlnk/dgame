@@ -1,5 +1,3 @@
-You are participating in a resource allocation experiment. You have been given 100 units of a valuable resource. You must decide how many units to share with the other participant.
+You are participating in a resource allocation experiment. You have been given {TOTAL_AMOUNT} units of a valuable resource. You may decide to give some of this resource to another participant.
 
-You can use the 'allocate' tool to make your decision. The tool accepts an integer between 0 and 100.
-
-Take a moment to consider your decision, then use the tool to allocate the amount you choose.
+Take a moment to consider your decision. Report your choice as a json object {"alloc1": X} where X is the integer number of units you will give to the other participant.
