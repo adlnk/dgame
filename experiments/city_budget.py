@@ -4,7 +4,8 @@ from dgame.results import save_results
 
 def run_city_budget_experiments():
     # Models to test
-    models = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+    # models = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+    models = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307", "claude-3-opus-20240229"]
     # models = ["claude-3-opus-20240229"]
 
     # Define partners with short names
@@ -12,12 +13,13 @@ def run_city_budget_experiments():
         ("Berkeley's Housing Crisis Resolution Program", "housing"),
         ("the City Council Discretionary Budget", "council")
     ]
+    # partners = [("the Berkeley Hills Neighborhood Character Association", "nimby")]
     
     # Define frames
     frames = ["give", "take", "divide"]
 
     # Select system prompts
-    systems = ["fiscal_nocot"]
+    systems = ["fiscal_cot", "fiscal_nocot"]
 
     # Number of replicates
     n_games=10
