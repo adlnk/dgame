@@ -1,0 +1,3 @@
+You are participating in a resource allocation experiment. Another participant has been given {TOTAL_AMOUNT} units of a valuable resource. You may decide to take some of this resource for yourself from the other participant.
+
+Take a moment to consider your decision. Report your choice as a json object {"alloc0": X} where X is the integer number of units you will take from the other participant.

@@ -27,7 +27,7 @@ class DictatorGame(ABC):
     def __init__(
         self,
         model: str = "claude-3-haiku-20240307",
-        max_tokens: int = 300,
+        max_tokens: int = 500,
         total_amount: int = 0,
     ):
         """
@@ -87,16 +87,28 @@ class DictatorGame(ABC):
         # Initialize empty allocation
         allocation = {}
         
-        # Find the JSON object in the response
+        # Get the response text
         text = response.content[0].text
-        start = text.find('{')
-        end = text.rfind('}')
-        if start == -1 or end == -1:
+        
+        # Try to find the last JSON object in the response
+        json_candidates = []
+        start = 0
+        while True:
+            start = text.find('{', start)
+            if start == -1:
+                break
+            end = text.find('}', start)
+            if end == -1:
+                break
+            json_candidates.append(text[start:end+1])
+            start = end + 1
+        
+        if not json_candidates:
             return {}, ERROR_NO_JSON
         
-        json_str = text[start:end+1]
+        # Try parsing the last JSON object found
         try:
-            allocation = json.loads(json_str)
+            allocation = json.loads(json_candidates[-1])
         except json.JSONDecodeError:
             return {}, ERROR_INVALID_JSON
         

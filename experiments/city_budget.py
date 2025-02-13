@@ -1,0 +1,74 @@
+from pathlib import Path
+from dgame.games import CityBudgetDGame
+from dgame.results import save_results
+
+def run_city_budget_experiments():
+    # Models to test
+    # models = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+    models = ["claude-3-opus-20240229"]
+
+    # Define partners and frames with short names
+    partners = [
+        ("Berkeley's Housing Crisis Resolution Program", "housing"),
+        ("the City Council Discretionary Budget", "council")
+    ]
+    
+    frames = ["give", "take", "divide"]
+    
+    # Total amount for all experiments
+    total_amount = 500000
+
+    # Number of replicates
+    n_games=2
+    
+    # Combined results filename
+    combined_filename = "city_budget_frame_partner_all_results.csv"
+    
+    # Run experiments for each combination
+    for model in models:
+        for partner, short_name in partners:
+            for frame in frames:
+                print(f"\nRunning experiment with model: {model}, partner: {short_name}, frame: {frame}")
+                
+                try:
+                    # Initialize game with appropriate prompts
+                    game = CityBudgetDGame(
+                        user_prompt_path=Path(f"prompts/city_budget/user/{frame}.txt"),
+                        system_prompt_path=Path("prompts/city_budget/system/fiscal.txt"),
+                        partner=partner,
+                        total_amount=total_amount,
+                        model=model
+                    )
+                    
+                    # Run single game with this configuration
+                    experiment_id=f"city_budget_{frame}_{short_name}"
+                    results = game.run_batch(
+                        n_games=n_games,
+                        experiment_id=experiment_id,
+                        frame=frame,
+                        partner=partner
+                    )
+                    
+                    # Save results with short name
+                    save_results(
+                        results,
+                        output_dir="results",
+                        experiment_id=experiment_id,
+                        combined_filename=combined_filename,
+                        save_individual=False
+                    )
+                    
+                    # Print allocation results
+                    game_id = results[0].get('game_id', 'unknown')
+                    print(f"Game ID: {game_id}", '\t', 
+                          f"Allocation: {results[0].get('alloc0', 'N/A')} / {results[0].get('alloc1', 'N/A')}")
+                    if results[0].get('error'):
+                        print(f"Error: {results[0]['error']}")
+                        
+                except Exception as e:
+                    print(f"Error running experiment: {str(e)}")
+
+if __name__ == "__main__":
+    print("Starting City Budget experiments...")
+    run_city_budget_experiments()
+    print("\nExperiments completed!")
