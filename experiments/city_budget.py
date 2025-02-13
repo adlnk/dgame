@@ -4,9 +4,8 @@ from dgame.results import save_results
 
 def run_city_budget_experiments():
     # Models to test
-    # models = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
-    models = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307", "claude-3-opus-20240229"]
-    # models = ["claude-3-opus-20240229"]
+    # models = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307", "claude-3-opus-20240229"]
+    models = ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307", "claude-3-opus-20240229"]
 
     # Define partners with short names
     partners = [
@@ -35,6 +34,10 @@ def run_city_budget_experiments():
             for system in systems:
                 for frame in frames:
                     print(f"\nRunning experiment with model: {model}, partner: {short_name}, system: {system}, frame: {frame}")
+
+                    if 'housing' in short_name and 'cot' in system and ('give' in frame or 'take' in frame):
+                        print("Skipping already-run combination")
+                        continue
 
                     if '_cot' in system and "opus" in model:
                         print("Skipping CoT for Opus models")
