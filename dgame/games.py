@@ -10,6 +10,7 @@ from anthropic.types import Message
 
 # Error codes
 ERROR_NO_JSON = "NO_JSON"
+ERROR_NO_JSON_REFUSAL = "REFUSAL"
 ERROR_INVALID_JSON = "INVALID_JSON"
 ERROR_MISSING_ALLOC = "MISSING_ALLOC"
 ERROR_INVALID_VALUES = "INVALID_VALUES"
@@ -104,6 +105,9 @@ class DictatorGame(ABC):
             start = end + 1
         
         if not json_candidates:
+            # Check if this is a refusal
+            if self._check_if_refusal(text):
+                return {}, ERROR_NO_JSON_REFUSAL
             return {}, ERROR_NO_JSON
         
         # Try parsing the last JSON object found
@@ -210,6 +214,47 @@ class DictatorGame(ABC):
         
         return results
     
+    def _check_if_refusal(self, text: str) -> bool:
+        """
+        Check if a response text represents a refusal to participate.
+        
+        Args:
+            text: Response text from the model
+            
+        Returns:
+            bool: True if the response appears to be a refusal
+        """
+        # Make API call to Claude to analyze the response
+        system_prompt = """You are analyzing an unparsable response from an AI in a resource allocation experiment.
+        Determine if the response represents a refusal to participate in the experiment (expressing discomfort, declining to 
+        make an allocation, stating ethical concerns, etc.) or if the lack of an expected json object in the output is for
+        some other reason.
+
+        Respond with a JSON object containing a single boolean field "is_refusal"."""
+
+        user_prompt = f"Analyze this response and determine if it represents a refusal to participate:\n\n{text}"
+
+        try:
+            response = self.client.messages.create(
+                model="claude-3-haiku-20240307",
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+                max_tokens=100
+            )
+
+            # Find the last JSON object in the response
+            text = response.content[0].text
+            start = text.rfind('{')
+            end = text.rfind('}')
+            if start == -1 or end == -1:
+                return False
+            
+            result = json.loads(text[start:end+1])
+            return result.get('is_refusal', False)
+        except Exception:
+            return False
+
+
 class SimpleDGame(DictatorGame):
     """
     Simple dictator game that loads prompts directly from files.
