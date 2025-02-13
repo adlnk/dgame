@@ -11,9 +11,9 @@ def run_city_budget_experiments():
     # Define partners with short names
     partners = [
         ("Berkeley's Housing Crisis Resolution Program", "housing"),
-        ("the City Council Discretionary Budget", "council")
+        ("the City Council Discretionary Budget", "council"),
+        ("the Berkeley Hills Neighborhood Character Association", "nimby")
     ]
-    # partners = [("the Berkeley Hills Neighborhood Character Association", "nimby")]
     
     # Define frames
     frames = ["give", "take", "divide"]
@@ -22,7 +22,7 @@ def run_city_budget_experiments():
     systems = ["fiscal_cot", "fiscal_nocot"]
 
     # Number of replicates
-    n_games=10
+    n_games=18
     
     # Total amount for all experiments
     total_amount = 500000
@@ -35,6 +35,10 @@ def run_city_budget_experiments():
             for system in systems:
                 for frame in frames:
                     print(f"\nRunning experiment with model: {model}, partner: {short_name}, system: {system}, frame: {frame}")
+
+                    if '_cot' in system and "opus" in model:
+                        print("Skipping CoT for Opus models")
+                        continue
                     
                     try:
                         # Initialize game with appropriate prompts
