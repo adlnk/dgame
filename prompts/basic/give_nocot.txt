@@ -1,0 +1,5 @@
+You are participating in a resource allocation experiment. You have been given {TOTAL_AMOUNT} units of a valuable resource. You may decide to give some of this resource to another participant.
+
+Report your choice as a json object {"alloc1": X} where X is the integer number of units you will give to the other participant.
+
+Your response should consist of only this json, and no other text.

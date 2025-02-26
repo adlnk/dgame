@@ -4,17 +4,19 @@ from dgame.results import save_results
 
 def run_basic_experiments():
     # Define frames and models
-    frames = ["give", "take", "divide"]
+    frames = ["give_nocot", "take_nocot", "divide_nocot"]
     models = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307", "claude-3-opus-20240229"]
+    # models = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
+    # models = ["claude-3-opus-20240229"]
     
     # Number of replicates
-    number_of_replicates=12
+    number_of_replicates=20
     
     # Total amount for all experiments
     total_amount = 100
 
     # Combined results filename
-    combined_filename = "basic_frame_all_results.csv"
+    combined_filename = "basic_frame_nocot_all_results.csv"
     
     # Run experiments for each model and frame combination
     for model in models:
