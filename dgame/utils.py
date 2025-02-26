@@ -1,16 +1,16 @@
 from typing import Optional
 import json
-from dgame.models import ModelRunner, AnthropicRunner
+from dgame.models import LLMInterface, AnthropicInterface
 
 # Create default refusal checker model
-DEFAULT_REFUSAL_CHECKER = AnthropicRunner("claude-3-haiku-20240307")
+DEFAULT_REFUSAL_CHECKER = AnthropicInterface("claude-3-haiku-20240307")
 
 class RefusalDetector:
     """
     Detects if a model response represents a refusal to participate in an experiment.
     """
     
-    def __init__(self, model_runner: Optional[ModelRunner] = None):
+    def __init__(self, model_runner: Optional[LLMInterface] = None):
         """
         Initialize the refusal detector.
         

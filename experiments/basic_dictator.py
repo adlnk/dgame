@@ -1,67 +1,51 @@
 from pathlib import Path
-from dgame.games import SimpleDGame
-from dgame.results import save_results
-from dgame.models import AnthropicInterface
+from dgame.games import SimpleDictatorGame
+from dgame.experiment import run_parameter_combinations, simple_experiment
+from dgame.models import claude_3_opus, claude_3_5_sonnet, claude_3_5_haiku, claude_3_haiku
 
 def run_basic_experiments():
-    # Define frames and models
-    frames = ["give_nocot", "take_nocot", "divide_nocot"]
-    model_names = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307", "claude-3-opus-20240229"]
-    # model_names = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]
-    # model_names = ["claude-3-opus-20240229"]
-    
-    # Number of replicates
-    number_of_replicates=20
-    
-    # Total amount for all experiments
-    total_amount = 100
+    # Define models
+    models = [claude_3_5_haiku, claude_3_5_sonnet, claude_3_haiku, claude_3_opus]
 
-    # Combined results filename
-    combined_filename = "basic_frame_nocot_all_results.csv"
+    # Define parameter dict
+    params = {
+        'frame': ["give_nocot", "take_nocot", "divide_nocot"]
+    }
     
-    # Run experiments for each model and frame combination
-    for model_name in model_names:
-        # Create model client
-        llm_client = AnthropicInterface(model_name)
-        
-        for frame in frames:
-            print(f"\nRunning experiment with model: {model_name}, frame: {frame}")
-            
-            try:
-                # Initialize game with appropriate prompts
-                game = SimpleDGame(
-                    prompt_path=Path(f"prompts/basic/{frame}.txt"),
-                    total_amount=total_amount
-                )
-                
-                # Run batch of games with this configuration
-                experiment_id = f"basic_{frame}"
-                results = game.run_batch(
-                    player=llm_client,
-                    n_games=number_of_replicates,
-                    experiment_id=experiment_id,
-                    frame=frame
-                )
-                
-                # Save results (only to combined file)
-                save_results(
-                    results,
-                    output_dir="results",
-                    experiment_id=experiment_id,
-                    combined_filename=combined_filename,
-                    save_individual=False  # Don't save individual CSV files
-                )
-                
-                # Print allocation results for all games
-                for result in results:
-                    game_id = result.get('game_id', 'unknown')
-                    print(f"Game ID: {game_id}", '\t', 
-                          f"Allocation: {result.get('alloc0', 'N/A')} / {result.get('alloc1', 'N/A')}")
-                    if result.get('error'):
-                        print(f"Error: {result['error']}")
-                    
-            except Exception as e:
-                print(f"Error running experiment: {str(e)}")
+    # Method 1: Using parameter combinations
+    def run_basic_game(model, experiment_id, n_games, frame, **kwargs):
+        """Run a basic dictator game with the given frame"""
+        game = SimpleDictatorGame(
+            prompt_path=Path(f"prompts/basic/{frame}.txt"),
+            total_amount=100
+        )
+        return game.run_batch(
+            player=model,
+            n_games=n_games,
+            experiment_id=experiment_id
+        )
+    
+    # Run full parameter combination experiment
+    print("Running parameter combination experiment...")
+    run_parameter_combinations(
+        models=models,
+        param_dict=params,
+        experiment_name="basic",
+        game_runner=run_basic_game,
+        n_games=20,
+        combined_filename="test_basic_frame_nocot_all_results.csv"
+    )
+    
+    # Method 2: Using simple_experiment shortcut for a specific test
+    # print("\nRunning simplified experiment for a specific configuration...")
+    # simple_experiment(
+    #     models=claude_3_5_sonnet,  # Just test one model
+    #     game_class=SimpleDictatorGame,
+    #     prompt_params={"prompt_path": Path("prompts/basic/give_nocot.txt")},
+    #     experiment_name="basic_give_sonnet_simple",
+    #     n_games=20,
+    #     combined_filename="basic_specific_tests.csv"
+    # )
 
 if __name__ == "__main__":
     print("Starting Basic Dictator Game experiments...")

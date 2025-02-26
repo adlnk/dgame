@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Tuple, Optional, Any
 from anthropic import Anthropic
 
-class ModelInterface(ABC):
+class LLMInterface(ABC):
     """
     Abstract base class for language model interfaces.
     Provides a unified interface for interacting with different LLMs,
@@ -37,7 +37,7 @@ class ModelInterface(ABC):
         """Get the model name."""
         pass
 
-class AnthropicInterface(ModelInterface):
+class AnthropicInterface(LLMInterface):
     """
     Client for interacting with Anthropic Claude models.
     """

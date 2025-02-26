@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 
 from anthropic import Anthropic
-from dgame.models import ModelInterface
+from dgame.models import LLMInterface
 from dgame.models import AnthropicInterface
 
 # Create default refusal checker
@@ -19,7 +19,7 @@ from typing import Dict, List, Optional, Any
 import uuid
 from datetime import datetime
 
-from dgame.models import ModelInterface
+from dgame.models import LLMInterface
 from dgame.utils import RefusalDetector, DEFAULT_REFUSAL_CHECKER
 
 # Error codes
