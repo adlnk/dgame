@@ -1,15 +1,15 @@
 from pathlib import Path
 import pandas as pd
-from typing import Dict, List, Union, Tuple
+from typing import Dict, List, Union, Tuple, Any
 
 def save_results(
-    results: List[Dict],
+    results: List[Dict[str, Any]],
     output_dir: Union[str, Path],
     experiment_id: str = None,
     batch_id: str = None,
     combined_filename: str = None,
     save_individual: bool = True
-) -> Tuple[Path, Path]:
+) -> Dict[str, Any]:
     """
     Save game results to CSV file and responses to separate text files.
     
@@ -22,7 +22,9 @@ def save_results(
         save_individual: Whether to save individual experiment CSV files
         
     Returns:
-        Tuple of (results_path, responses_dir) where results_path will be None if only saving combined
+        Dictionary containing:
+            - 'results_path': Path to saved results (or None if combined only)
+            - 'responses_dir': Path to directory containing response files
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True)
@@ -69,7 +71,10 @@ def save_results(
         if not save_individual:
             output_path = combined_path
     
-    return output_path, responses_dir
+    return {
+        'results_path': output_path,
+        'responses_dir': responses_dir
+    }
 
 def load_results(filepath: Union[str, Path]) -> pd.DataFrame:
     """

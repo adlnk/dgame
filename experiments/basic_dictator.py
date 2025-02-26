@@ -1,7 +1,7 @@
 from pathlib import Path
 from dgame.games import SimpleDGame
 from dgame.results import save_results
-from dgame.models import AnthropicRunner
+from dgame.models import AnthropicInterface
 
 def run_basic_experiments():
     # Define frames and models
@@ -22,7 +22,7 @@ def run_basic_experiments():
     # Run experiments for each model and frame combination
     for model_name in model_names:
         # Create model client
-        llm_client = AnthropicRunner(model_name)
+        llm_client = AnthropicInterface(model_name)
         
         for frame in frames:
             print(f"\nRunning experiment with model: {model_name}, frame: {frame}")

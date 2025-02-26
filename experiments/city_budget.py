@@ -1,7 +1,7 @@
 from pathlib import Path
 from dgame.games import CityBudgetDGame
 from dgame.results import save_results
-from dgame.models import AnthropicRunner
+from dgame.models import AnthropicInterface
 
 def run_city_budget_experiments():
     # Models to test
@@ -32,7 +32,7 @@ def run_city_budget_experiments():
     # Run experiments for each combination
     for model_name in model_names:
         # Create model client
-        llm_client = AnthropicRunner(model_name)
+        llm_client = AnthropicInterface(model_name)
         
         for partner, short_name in partners:
             for system in systems:

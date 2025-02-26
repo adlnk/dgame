@@ -6,11 +6,21 @@ import uuid
 from datetime import datetime
 
 from anthropic import Anthropic
-from dgame.models import ModelRunner
-from dgame.models import AnthropicRunner
+from dgame.models import ModelInterface
+from dgame.models import AnthropicInterface
 
 # Create default refusal checker
-default_refusal_checker = AnthropicRunner("claude-3-haiku-20240307")
+default_refusal_checker = AnthropicInterface("claude-3-haiku-20240307")
+
+from abc import ABC, abstractmethod
+from pathlib import Path
+import json
+from typing import Dict, List, Optional, Any
+import uuid
+from datetime import datetime
+
+from dgame.models import ModelInterface
+from dgame.utils import RefusalDetector, DEFAULT_REFUSAL_CHECKER
 
 # Error codes
 ERROR_NO_JSON = "NO_JSON"
@@ -33,7 +43,7 @@ class DictatorGame(ABC):
         self,
         total_amount: int = 0,
         max_tokens: int = 500,
-        refusal_checker: ModelRunner = None,
+        refusal_detector: Optional[RefusalDetector] = None,
     ):
         """
         Initialize dictator game.
@@ -41,56 +51,96 @@ class DictatorGame(ABC):
         Args:
             total_amount: Total amount to be allocated between players
             max_tokens: Maximum tokens in model response
-            refusal_checker: Model runner used for checking refusals (defaults to claude-3-haiku)
+            refusal_detector: Refusal detector for checking refusals
         """
         self.total_amount = total_amount
         self.max_tokens = max_tokens
-        self._refusal_checker = refusal_checker or default_refusal_checker
+        self.refusal_detector = refusal_detector or RefusalDetector()
     
     @abstractmethod
-    def get_prompts(self, **kwargs) -> Tuple[str, str]:
+    def get_prompts(self, **kwargs) -> Dict[str, str]:
         """
         Get system and user prompts for the game.
         
         Returns:
-            Tuple of (system_prompt, user_prompt)
+            Dict containing 'system_prompt' and 'user_prompt' keys
         """
         pass
     
-    def validate_allocation(self, allocation: Dict[str, int]) -> None:
+    def validate_allocation(self, allocation: Dict[str, int]) -> Dict[str, Any]:
         """
         Validate that the allocation is valid.
         
         Args:
             allocation: Dictionary containing alloc0 and alloc1
             
-        Raises:
-            ValueError: If allocation is invalid
+        Returns:
+            Dict with validation results:
+                - 'is_valid': bool, whether allocation is valid
+                - 'error': error code or empty string if valid
+                - 'message': error message or empty string if valid
         """
-        if not isinstance(allocation['alloc0'], int) or not isinstance(allocation['alloc1'], int):
-            raise ValueError("Allocations must be integers")
+        result = {
+            'is_valid': True,
+            'error': '',
+            'message': ''
+        }
         
-        if allocation['alloc0'] < 0 or allocation['alloc1'] < 0:
-            raise ValueError("Allocations cannot be negative")
+        try:
+            # Check types
+            if not isinstance(allocation.get('alloc0'), int) or not isinstance(allocation.get('alloc1'), int):
+                result.update({
+                    'is_valid': False,
+                    'error': ERROR_INVALID_VALUES,
+                    'message': "Allocations must be integers"
+                })
+                return result
             
-        if allocation['alloc0'] + allocation['alloc1'] != self.total_amount:
-            raise ValueError(f"Allocations must sum to {self.total_amount}")
+            # Check for negative values
+            if allocation['alloc0'] < 0 or allocation['alloc1'] < 0:
+                result.update({
+                    'is_valid': False,
+                    'error': ERROR_NEGATIVE,
+                    'message': "Allocations cannot be negative"
+                })
+                return result
+            
+            # Check sum
+            if allocation['alloc0'] + allocation['alloc1'] != self.total_amount:
+                result.update({
+                    'is_valid': False,
+                    'error': ERROR_SUM_MISMATCH,
+                    'message': f"Allocations must sum to {self.total_amount}"
+                })
+                return result
+            
+            return result
+        except Exception as e:
+            result.update({
+                'is_valid': False,
+                'error': 'UNEXPECTED_ERROR',
+                'message': str(e)
+            })
+            return result
 
-    def parse_allocation(self, response_text: str, refusal_checker: ModelRunner = None) -> Tuple[Dict[str, int], str]:
+    def parse_allocation(self, response_text: str) -> Dict[str, Any]:
         """
         Parse allocation from model response.
         
         Args:
             response_text: Text response from model
-            refusal_checker: Model to use for refusal checking
         
         Returns:
-            Tuple of (allocation_dict, error_code)
-            allocation_dict may contain partial data if there was an error
-            error_code will be empty string if no error
+            Dict containing:
+                - 'allocation': Dict with allocation or empty if error
+                - 'error': error code or empty string if no error
+                - 'is_valid': bool indicating if allocation is valid
         """
-        # Initialize empty allocation
-        allocation = {}
+        result = {
+            'allocation': {},
+            'error': '',
+            'is_valid': False
+        }
         
         # Try to find the last JSON object in the response
         json_candidates = []
@@ -107,15 +157,19 @@ class DictatorGame(ABC):
         
         if not json_candidates:
             # Check if this is a refusal
-            if self._check_if_refusal(response_text, refusal_checker):
-                return {}, ERROR_NO_JSON_REFUSAL
-            return {}, ERROR_NO_JSON
+            if self.refusal_detector.is_refusal(response_text):
+                result['error'] = ERROR_NO_JSON_REFUSAL
+            else:
+                result['error'] = ERROR_NO_JSON
+            return result
         
         # Try parsing the last JSON object found
         try:
             allocation = json.loads(json_candidates[-1])
+            result['allocation'] = allocation
         except json.JSONDecodeError:
-            return {}, ERROR_INVALID_JSON
+            result['error'] = ERROR_INVALID_JSON
+            return result
         
         # Convert values to integers
         try:
@@ -123,7 +177,8 @@ class DictatorGame(ABC):
                 if key in allocation:
                     allocation[key] = int(allocation[key])
         except (ValueError, TypeError):
-            return allocation, ERROR_INVALID_VALUES
+            result['error'] = ERROR_INVALID_VALUES
+            return result
         
         # Infer missing allocation if possible
         if 'alloc0' in allocation and 'alloc1' not in allocation:
@@ -131,19 +186,24 @@ class DictatorGame(ABC):
         elif 'alloc1' in allocation and 'alloc0' not in allocation:
             allocation['alloc0'] = self.total_amount - allocation['alloc1']
         elif 'alloc0' not in allocation and 'alloc1' not in allocation:
-            return {}, ERROR_MISSING_ALLOC
+            result['error'] = ERROR_MISSING_ALLOC
+            return result
         
-        # Check for negative values but preserve the allocations
+        # Check for negative values
         if allocation['alloc0'] < 0 or allocation['alloc1'] < 0:
-            return allocation, ERROR_NEGATIVE
+            result['error'] = ERROR_NEGATIVE
+            return result
         
-        # Check sum but preserve the allocations
+        # Check sum
         if allocation['alloc0'] + allocation['alloc1'] != self.total_amount:
-            return allocation, ERROR_SUM_MISMATCH
-            
-        return allocation, ""
+            result['error'] = ERROR_SUM_MISMATCH
+            return result
+        
+        # If we got here, allocation is valid
+        result['is_valid'] = True
+        return result
     
-    def run_game(self, player: ModelRunner, **kwargs) -> Dict:
+    def run_game(self, player: LLMInterface, **kwargs) -> Dict[str, Any]:
         """
         Run a single game and return results.
         
@@ -155,17 +215,25 @@ class DictatorGame(ABC):
             Dict containing game results and any error codes
         """
         # Get prompts
-        system_prompt, user_prompt = self.get_prompts(**kwargs)
+        prompts = self.get_prompts(**kwargs)
+        system_prompt = prompts.get('system_prompt', None)
+        user_prompt = prompts.get('user_prompt')
         
         # Run game with provided client
-        response_text, token_usage = player.generate_response(
+        response = player.generate(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             max_tokens=self.max_tokens
         )
         
+        # Extract response text and token usage
+        response_text = response['text']
+        token_usage = response['usage']
+        
         # Parse results
-        allocation, error = self.parse_allocation(response_text, player)
+        parse_result = self.parse_allocation(response_text)
+        allocation = parse_result['allocation']
+        error = parse_result['error']
         
         # Return results with metadata
         result = {
@@ -183,17 +251,20 @@ class DictatorGame(ABC):
         
         # Update with any parsed allocations, even if there were errors
         if allocation:
-            result.update(allocation)
+            if 'alloc0' in allocation:
+                result['alloc0'] = allocation['alloc0']
+            if 'alloc1' in allocation:
+                result['alloc1'] = allocation['alloc1']
         
         return result
     
     def run_batch(
         self,
-        player: ModelRunner,
+        player: LLMInterface,
         n_games: int = 5,
         experiment_id: Optional[str] = None,
         **kwargs
-    ) -> List[Dict]:
+    ) -> List[Dict[str, Any]]:
         """
         Run multiple games with the same parameters.
         
@@ -219,48 +290,8 @@ class DictatorGame(ABC):
             results.append(result)
         
         return results
-    
-    def _check_if_refusal(self, text: str, refusal_checker: ModelRunner) -> bool:
-        """
-        Check if a response text represents a refusal to participate.
-        
-        Args:
-            text: Response text from the model
-            refusal_checker: Model runner to use for refusal checking
-            
-        Returns:
-            bool: True if the response appears to be a refusal
-        """
-        # Make API call to check refusal
-        system_prompt = """You are analyzing an unparsable response from an AI in a resource allocation experiment.
-        Determine if the response represents a refusal to participate in the experiment (expressing discomfort, declining to 
-        make an allocation, stating ethical concerns, etc.) or if the lack of an expected json object in the output is for
-        some other reason.
 
-        Respond with a JSON object containing a single boolean field "is_refusal"."""
-
-        user_prompt = f"Analyze this response and determine if it represents a refusal to participate:\n\n{text}"
-
-        try:
-            response_text, _ = refusal_checker.generate_response(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                max_tokens=100
-            )
-
-            # Find the last JSON object in the response
-            start = response_text.rfind('{')
-            end = response_text.rfind('}')
-            if start == -1 or end == -1:
-                return False
-            
-            result = json.loads(response_text[start:end+1])
-            return result.get('is_refusal', False)
-        except Exception:
-            return False
-
-
-class SimpleDGame(DictatorGame):
+class SimpleDictatorGame(DictatorGame):
     """
     Simple dictator game that loads prompts directly from files.
     """
@@ -292,13 +323,16 @@ class SimpleDGame(DictatorGame):
             else None
         )
         
-    def get_prompts(self, **kwargs):
+    def get_prompts(self, **kwargs) -> Dict[str, str]:
         """Return loaded prompts."""
         user_prompt = self.user_prompt.replace("{TOTAL_AMOUNT}", str(self.total_amount))
-        return self.system_prompt, user_prompt
+        return {
+            'system_prompt': self.system_prompt,
+            'user_prompt': user_prompt
+        }
 
 
-class CityBudgetDGame(DictatorGame):
+class CityBudgetDictatorGame(DictatorGame):
     """
     City budget allocation game with dynamic prompt construction.
     """
@@ -329,7 +363,7 @@ class CityBudgetDGame(DictatorGame):
         self.system_prompt = self.system_prompt_path.read_text()
         self.user_prompt_template = self.user_prompt_path.read_text()
             
-    def get_prompts(self, **kwargs):
+    def get_prompts(self, **kwargs) -> Dict[str, str]:
         """
         Get prompts with partner and total amount substituted, formatted as USD.
         """
@@ -337,4 +371,52 @@ class CityBudgetDGame(DictatorGame):
         user_prompt = (self.user_prompt_template
                       .replace("{PARTNER_NAME}", self.partner)
                       .replace("{TOTAL_AMOUNT}", formatted_total_amount))
-        return self.system_prompt, user_prompt
+        return {
+            'system_prompt': self.system_prompt,
+            'user_prompt': user_prompt
+        }
+
+
+class DataCenterDictatorGame(DictatorGame):
+    """
+    Data center allocation game with dynamic prompt construction.
+    """
+    def __init__(
+        self,
+        user_prompt_path: Path,
+        partner: str,
+        partner_company: str,
+        **kwargs
+    ):
+        """
+        Initialize game.
+        
+        Args:
+            user_prompt_path: Path to user prompt template file
+            partner: Name of partner to use
+            partner_company: Company name of partner
+            **kwargs: Additional arguments passed to DictatorGame
+        """
+        super().__init__(**kwargs)
+        self.user_prompt_path = Path(user_prompt_path)
+        self.partner = partner
+        self.partner_company = partner_company
+        self._load_content()
+        
+    def _load_content(self):
+        """Load user prompt template."""
+        self.user_prompt_template = self.user_prompt_path.read_text()
+            
+    def get_prompts(self, **kwargs) -> Dict[str, str]:
+        """
+        Get prompts with partner and total amount substituted, formatted as number.
+        """
+        formatted_total_amount = "{:,}".format(self.total_amount)
+        user_prompt = (self.user_prompt_template
+                      .replace("{PARTNER_NAME}", self.partner)
+                      .replace("{PARTNER_COMPANY}", self.partner_company)
+                      .replace("{TOTAL_AMOUNT}", formatted_total_amount))
+        return {
+            'system_prompt': None,
+            'user_prompt': user_prompt
+        }

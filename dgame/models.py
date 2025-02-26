@@ -2,17 +2,18 @@ from abc import ABC, abstractmethod
 from typing import Dict, Tuple, Optional, Any
 from anthropic import Anthropic
 
-class ModelRunner(ABC):
+class ModelInterface(ABC):
     """
-    Abstract base class for language model clients.
-    Provides a unified interface for interacting with different LLM APIs.
+    Abstract base class for language model interfaces.
+    Provides a unified interface for interacting with different LLMs,
+    whether API-based or locally hosted.
     """
     
     @abstractmethod
-    def generate_response(self, 
-                           system_prompt: Optional[str], 
-                           user_prompt: str, 
-                           max_tokens: int) -> Tuple[str, Dict[str, int]]:
+    def generate(self, 
+                 system_prompt: Optional[str], 
+                 user_prompt: str, 
+                 max_tokens: int) -> Dict[str, Any]:
         """
         Generate a response from the language model.
         
@@ -22,10 +23,11 @@ class ModelRunner(ABC):
             max_tokens: Maximum number of tokens to generate
             
         Returns:
-            Tuple of (response_text, token_usage_dict)
-            token_usage_dict should contain at least:
-                - 'input_tokens': number of input tokens
-                - 'output_tokens': number of output tokens
+            Dict containing at least:
+                - 'text': the generated text response
+                - 'usage': a dictionary with token usage statistics
+                  - 'input_tokens': number of input tokens
+                  - 'output_tokens': number of output tokens
         """
         pass
     
@@ -35,7 +37,7 @@ class ModelRunner(ABC):
         """Get the model name."""
         pass
 
-class AnthropicRunner(ModelRunner):
+class AnthropicInterface(ModelInterface):
     """
     Client for interacting with Anthropic Claude models.
     """
@@ -47,13 +49,14 @@ class AnthropicRunner(ModelRunner):
         Args:
             model_name: Name of Claude model to use
         """
+        from anthropic import Anthropic
         self._model_name = model_name
         self.client = Anthropic()
         
-    def generate_response(self, 
-                          system_prompt: Optional[str], 
-                          user_prompt: str, 
-                          max_tokens: int) -> Tuple[str, Dict[str, int]]:
+    def generate(self, 
+                system_prompt: Optional[str], 
+                user_prompt: str, 
+                max_tokens: int) -> Dict[str, Any]:
         """
         Generate a response from a Claude model.
         
@@ -63,7 +66,7 @@ class AnthropicRunner(ModelRunner):
             max_tokens: Maximum tokens to generate
             
         Returns:
-            Tuple of (response_text, token_usage)
+            Dict containing 'text' and 'usage' information
         """
         response = self.client.messages.create(
             model=self._model_name,
@@ -72,14 +75,21 @@ class AnthropicRunner(ModelRunner):
             max_tokens=max_tokens
         )
         
-        token_usage = {
-            'input_tokens': response.usage.input_tokens,
-            'output_tokens': response.usage.output_tokens
+        return {
+            "text": response.content[0].text,
+            "usage": {
+                "input_tokens": response.usage.input_tokens,
+                "output_tokens": response.usage.output_tokens
+            }
         }
-        
-        return response.content[0].text, token_usage
     
     @property
     def model_name(self) -> str:
         """Get the model name."""
         return self._model_name
+
+# Pre-defined model instances
+claude_3_opus = AnthropicInterface("claude-3-opus-20240229")
+claude_3_5_sonnet = AnthropicInterface("claude-3-5-sonnet-20241022")
+claude_3_5_haiku = AnthropicInterface("claude-3-5-haiku-20241022")
+claude_3_haiku = AnthropicInterface("claude-3-haiku-20240307")

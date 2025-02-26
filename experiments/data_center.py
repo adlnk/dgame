@@ -1,7 +1,7 @@
 from pathlib import Path
 from dgame.games import DictatorGame
 from dgame.results import save_results
-from dgame.models import AnthropicRunner
+from dgame.models import AnthropicInterface
 
 class DataCenterDGame(DictatorGame):
     """
@@ -80,7 +80,7 @@ def run_data_center_experiments():
         for frame in frames:
             for model_name in model_names:
                 # Create model client
-                llm_client = AnthropicRunner(model_name)
+                llm_client = AnthropicInterface(model_name)
                 
                 for partner, company in partners:
                     print(f"\nRunning experiment with model: {model_name}, partner: {partner}, frame: {set}/{frame}")
