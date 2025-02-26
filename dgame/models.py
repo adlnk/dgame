@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Tuple, Optional, Any
-from anthropic import Anthropic, AsyncAnthropic
+from anthropic import Anthropic
 
 class ModelRunner(ABC):
     """
@@ -15,27 +15,6 @@ class ModelRunner(ABC):
                            max_tokens: int) -> Tuple[str, Dict[str, int]]:
         """
         Generate a response from the language model.
-        
-        Args:
-            system_prompt: Optional system prompt
-            user_prompt: User prompt (required)
-            max_tokens: Maximum number of tokens to generate
-            
-        Returns:
-            Tuple of (response_text, token_usage_dict)
-            token_usage_dict should contain at least:
-                - 'input_tokens': number of input tokens
-                - 'output_tokens': number of output tokens
-        """
-        pass
-    
-    @abstractmethod
-    async def generate_response_async(self, 
-                                     system_prompt: Optional[str], 
-                                     user_prompt: str, 
-                                     max_tokens: int) -> Tuple[str, Dict[str, int]]:
-        """
-        Generate a response asynchronously from the language model.
         
         Args:
             system_prompt: Optional system prompt
@@ -87,38 +66,6 @@ class AnthropicRunner(ModelRunner):
             Tuple of (response_text, token_usage)
         """
         response = self.client.messages.create(
-            model=self._model_name,
-            system=system_prompt if system_prompt else "",
-            messages=[{"role": "user", "content": user_prompt}],
-            max_tokens=max_tokens
-        )
-        
-        token_usage = {
-            'input_tokens': response.usage.input_tokens,
-            'output_tokens': response.usage.output_tokens
-        }
-        
-        return response.content[0].text, token_usage
-    
-    async def generate_response_async(self, 
-                                     system_prompt: Optional[str], 
-                                     user_prompt: str, 
-                                     max_tokens: int) -> Tuple[str, Dict[str, int]]:
-        """
-        Generate a response asynchronously from a Claude model.
-        
-        Args:
-            system_prompt: Optional system prompt
-            user_prompt: User prompt
-            max_tokens: Maximum tokens to generate
-            
-        Returns:
-            Tuple of (response_text, token_usage)
-        """
-        # Use AsyncAnthropic client for async operations
-        async_client = AsyncAnthropic()
-        
-        response = await async_client.messages.create(
             model=self._model_name,
             system=system_prompt if system_prompt else "",
             messages=[{"role": "user", "content": user_prompt}],

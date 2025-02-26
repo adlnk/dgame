@@ -1,4 +1,3 @@
-# dgame/games.py
 from abc import ABC, abstractmethod
 from pathlib import Path
 import json
