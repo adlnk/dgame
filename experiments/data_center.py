@@ -1,7 +1,7 @@
 from pathlib import Path
 from dgame.games import DictatorGame
 from dgame.results import save_results
-
+from dgame.models import AnthropicRunner
 
 class DataCenterDGame(DictatorGame):
     """
@@ -19,8 +19,8 @@ class DataCenterDGame(DictatorGame):
         
         Args:
             user_prompt_path: Path to user prompt template file
-            system_prompt_path: Path to system prompt file
             partner: Name of partner to use
+            partner_company: Company name of partner
             **kwargs: Additional arguments passed to DictatorGame
         """
         super().__init__(**kwargs)
@@ -30,12 +30,12 @@ class DataCenterDGame(DictatorGame):
         self._load_content()
         
     def _load_content(self):
-        """Load system prompt and user prompt template."""
+        """Load user prompt template."""
         self.user_prompt_template = self.user_prompt_path.read_text()
             
     def get_prompts(self, **kwargs):
         """
-        Get prompts with partner and total amount substituted, formatted as USD.
+        Get prompts with partner and total amount substituted, formatted as number.
         """
         formatted_total_amount = "{:,}".format(self.total_amount)
         user_prompt = (self.user_prompt_template
@@ -46,7 +46,7 @@ class DataCenterDGame(DictatorGame):
 
 def run_data_center_experiments():
     # Models to test
-    models = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307", "claude-3-opus-20240229"]
+    model_names = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307", "claude-3-opus-20240229"]
 
     # Define partners with short names
     partners = [
@@ -78,9 +78,12 @@ def run_data_center_experiments():
     # Run experiments for each combination
     for set in sets:
         for frame in frames:
-            for model in models:
+            for model_name in model_names:
+                # Create model client
+                llm_client = AnthropicRunner(model_name)
+                
                 for partner, company in partners:
-                    print(f"\nRunning experiment with model: {model}, partner: {partner}, frame: {set}/{frame}")
+                    print(f"\nRunning experiment with model: {model_name}, partner: {partner}, frame: {set}/{frame}")
 
                     try:
                         # Initialize game with appropriate prompts
@@ -88,13 +91,13 @@ def run_data_center_experiments():
                             user_prompt_path=Path(f"prompts/data_center/{set}/{frame}.txt"),
                             partner=partner,
                             partner_company=company,
-                            total_amount=total_amount,
-                            model=model
+                            total_amount=total_amount
                         )
                         
-                        # Run single game with this configuration
+                        # Run batch of games with this configuration
                         experiment_id=f"data_center_{set}_{frame}_{partner}"
                         results = game.run_batch(
+                            player=llm_client,
                             n_games=n_games,
                             experiment_id=experiment_id,
                             frame=frame,

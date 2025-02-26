@@ -1,11 +1,12 @@
 from pathlib import Path
 from dgame.games import CityBudgetDGame
 from dgame.results import save_results
+from dgame.models import AnthropicRunner
 
 def run_city_budget_experiments():
     # Models to test
-    models = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307", "claude-3-opus-20240229"]
-    # models = ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307", "claude-3-opus-20240229"]
+    model_names = ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307", "claude-3-opus-20240229"]
+    # model_names = ["claude-3-5-sonnet-20241022", "claude-3-haiku-20240307", "claude-3-opus-20240229"]
 
     # Define partners with short names
     partners = [
@@ -29,13 +30,16 @@ def run_city_budget_experiments():
     combined_filename = "city_budget_system_frame_partner_all_results.csv"
     
     # Run experiments for each combination
-    for model in models:
+    for model_name in model_names:
+        # Create model client
+        llm_client = AnthropicRunner(model_name)
+        
         for partner, short_name in partners:
             for system in systems:
                 for frame in frames:
-                    print(f"\nRunning experiment with model: {model}, partner: {short_name}, system: {system}, frame: {frame}")
+                    print(f"\nRunning experiment with model: {model_name}, partner: {short_name}, system: {system}, frame: {frame}")
 
-                    if '_cot' in system and "opus" in model:
+                    if '_cot' in system and "opus" in model_name:
                         print("Skipping CoT for Opus models")
                         continue
                     
@@ -45,13 +49,13 @@ def run_city_budget_experiments():
                             user_prompt_path=Path(f"prompts/city_budget/user/{frame}.txt"),
                             system_prompt_path=Path(f"prompts/city_budget/system/{system}.txt"),
                             partner=partner,
-                            total_amount=total_amount,
-                            model=model
+                            total_amount=total_amount
                         )
                         
-                        # Run single game with this configuration
+                        # Run batch of games with this configuration
                         experiment_id=f"city_budget_{system}_{frame}_{short_name}"
                         results = game.run_batch(
+                            player=llm_client,
                             n_games=n_games,
                             experiment_id=experiment_id,
                             frame=frame,

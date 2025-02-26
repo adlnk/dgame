@@ -5,11 +5,11 @@ from typing import Dict, List, Optional, Union, Tuple
 import uuid
 from datetime import datetime
 import asyncio
-from anthropic import AsyncAnthropic
 
 # Import the original DictatorGame
 from .games import DictatorGame, SimpleDGame, CityBudgetDGame
 from .games import *
+from .models import ModelRunner
 
 class AsyncDictatorGame(DictatorGame):
     """
@@ -17,37 +17,41 @@ class AsyncDictatorGame(DictatorGame):
     Only overrides methods that need to be async.
     """
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Override the client with async version
-        self.client = AsyncAnthropic()
-    
-    async def run_game(self, **kwargs) -> Dict:
+    async def run_game(self, player: ModelRunner, **kwargs) -> Dict:
         """
         Async version of run_game.
+        
+        Args:
+            llm_client: Client to use for model access
+            **kwargs: Additional arguments passed to get_prompts
+            
+        Returns:
+            Dict containing game results and any error codes
         """
+        # Store refusal client
+        self._refusal_client = player
+        
         # Get prompts (reuse parent class method)
         system_prompt, user_prompt = self.get_prompts(**kwargs)
         
         # Make async API call
-        response = await self.client.messages.create(
-            model=self.model,
-            system=system_prompt if system_prompt else "",
-            messages=[{"role": "user", "content": user_prompt}],
+        response_text, token_usage = await player.generate_response_async(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
             max_tokens=self.max_tokens
         )
         
-        # Reuse parent class parsing logic
-        allocation, error = self.parse_allocation(response)
+        # Parse results (need to use async version)
+        allocation, error = await self.parse_allocation_async(response_text, player)
         
         result = {
             "game_id": str(uuid.uuid4()),
-            "model": self.model,
+            "model": player.model_name,
             "timestamp": datetime.now().isoformat(),
             "error": error,
-            "input_tokens_used": response.usage.input_tokens,
-            "output_tokens_used": response.usage.output_tokens,
-            "response": response.content[0].text,
+            "input_tokens_used": token_usage['input_tokens'],
+            "output_tokens_used": token_usage['output_tokens'],
+            "response": response_text,
             "alloc0": None,
             "alloc1": None
         }
@@ -59,19 +63,29 @@ class AsyncDictatorGame(DictatorGame):
     
     async def run_batch(
         self,
+        llm_client: ModelRunner,
         n_games: int = 5,
         experiment_id: Optional[str] = None,
         **kwargs
     ) -> List[Dict]:
         """
         Async version of run_batch that runs games in parallel.
+        
+        Args:
+            llm_client: Client to use for model access
+            n_games: Number of games to run
+            experiment_id: Optional identifier for this experiment
+            **kwargs: Additional arguments passed to get_prompts
+            
+        Returns:
+            List of result dictionaries
         """
         batch_id = f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
         # Create tasks for all games
         tasks = []
         for _ in range(n_games):
-            task = asyncio.create_task(self.run_game(**kwargs))
+            task = asyncio.create_task(self.run_game(player=llm_client, **kwargs))
             tasks.append(task)
         
         # Wait for all tasks to complete
@@ -85,9 +99,16 @@ class AsyncDictatorGame(DictatorGame):
         
         return results
 
-    async def _check_if_refusal(self, text: str) -> bool:
+    async def _check_if_refusal_async(self, text: str, refusal_checker: ModelRunner) -> bool:
         """
         Async version of refusal check.
+        
+        Args:
+            text: Response text from the model
+            refusal_checker: Client to use for refusal checking
+            
+        Returns:
+            bool: True if the response appears to be a refusal
         """
         system_prompt = """You are analyzing an unparsable response from an AI in a resource allocation experiment.
         Determine if the response represents a refusal to participate in the experiment (expressing discomfort, declining to 
@@ -99,50 +120,52 @@ class AsyncDictatorGame(DictatorGame):
         user_prompt = f"Analyze this response and determine if it represents a refusal to participate:\n\n{text}"
 
         try:
-            response = await self.client.messages.create(
-                model="claude-3-haiku-20240307",
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}],
+            response_text, _ = await refusal_checker.generate_response_async(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
                 max_tokens=100
             )
 
-            text = response.content[0].text
-            start = text.rfind('{')
-            end = text.rfind('}')
+            start = response_text.rfind('{')
+            end = response_text.rfind('}')
             if start == -1 or end == -1:
                 return False
             
-            result = json.loads(text[start:end+1])
+            result = json.loads(response_text[start:end+1])
             return result.get('is_refusal', False)
         except Exception:
             return False
 
-    async def parse_allocation(self, response: Message) -> Tuple[Dict[str, int], str]:
+    async def parse_allocation_async(self, response_text: str, refusal_checker: ModelRunner) -> Tuple[Dict[str, int], str]:
         """
         Async version of parse_allocation to handle async refusal checking.
+        
+        Args:
+            response_text: Text response from the model
+            refusal_checker: Client to use for refusal checking
+            
+        Returns:
+            Tuple of (allocation_dict, error_code)
         """
         # Initialize empty allocation
         allocation = {}
-        
-        # Get the response text
-        text = response.content[0].text
         
         # Try to find the last JSON object in the response
         json_candidates = []
         start = 0
         while True:
-            start = text.find('{', start)
+            start = response_text.find('{', start)
             if start == -1:
                 break
-            end = text.find('}', start)
+            end = response_text.find('}', start)
             if end == -1:
                 break
-            json_candidates.append(text[start:end+1])
+            json_candidates.append(response_text[start:end+1])
             start = end + 1
         
         if not json_candidates:
             # Check if this is a refusal
-            if await self._check_if_refusal(text):
+            if await self._check_if_refusal_async(response_text, refusal_checker):
                 return {}, ERROR_NO_JSON_REFUSAL
             return {}, ERROR_NO_JSON
         
